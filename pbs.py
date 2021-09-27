@@ -88,14 +88,14 @@ class Constraints:
         return "VC: " + str([str(vc) for vc in self.vertex_constraints]) 
     
 class PBS:
-    def __init__(self, environment, priority_by_order_time = True):
+    def __init__(self, environment, priority_by_order_time = True, not_allow_return = False):
         self.env = environment
         self.a_star = AStar(self)
         self.constraints = Constraints()
         self.constraint_dict = {}
-        self.retry_time_if_fail = 5
         self.priority_list = []
         self.priority_by_order_time = priority_by_order_time
+        self.not_allow_return = not_allow_return
         
     def search(self, move_priority_list = [], charge_priority_list = [], order_priority_list = []):
         
@@ -128,40 +128,23 @@ class PBS:
                     break
  
         
-        start = HighLevelNode()
+        solution = self.compute_solution(self.priority_list)
         
-        start.priority_list = self.priority_list
-        
-        start.solution = self.compute_solution(start.priority_list)
-        
-        if start.solution:
+        if solution:
             
             print("solution found")
             
-            return self.generate_plan(start.solution)
-        
-        count = 0
-        
-        while count < self.retry_time_if_fail:
-            
-            shuffle(start.priority_list)
-            
-            start.solution = self.compute_solution(start.priority_list)
-        
-            if start.solution:
-            
-                print("solution found")
-                
-                return self.generate_plan(start.solution)
-            
-            count += 1
-        
+            return self.generate_plan(solution)
 
         return {}
     
     def get_neighbors(self, state, agent_name):
         neighbors = []
         
+        # Wait action
+        n = State(state.time + 1, state.location)
+        if self.state_valid(n, agent_name):
+            neighbors.append(n)
         
         # Right action
         n = State(state.time + 1, Location(state.location.x+1, state.location.y))
@@ -177,15 +160,11 @@ class PBS:
         n = State(state.time + 1, Location(state.location.x, state.location.y+1))
         if self.state_valid(n, agent_name):
             neighbors.append(n)
+            
         # Down action
         n = State(state.time + 1, Location(state.location.x, state.location.y-1))
         if self.state_valid(n, agent_name):
             neighbors.append(n)   
-            
-        # Wait action
-        n = State(state.time + 1, state.location)
-        if self.state_valid(n, agent_name):
-            neighbors.append(n)
             
         return neighbors
     
@@ -205,7 +184,7 @@ class PBS:
         else:
             return solution[agent_name][-1]
 
-    def state_valid(self, state, agent_name, allow_repeat_path = True):
+    def state_valid(self, state, agent_name):
         if State(0, self.env.agent_dict[agent_name].location).is_equal_except_time(state):
             return True
         elif VertexConstraint(state.location) not in self.constraints.vertex_constraints:
@@ -217,10 +196,19 @@ class PBS:
                 return True
         
         # if allow repeat paths 
-        if (allow_repeat_path):
-            for location in self.env.agent_dict[agent_name].path_list:
-                if(location == state.location):
-                    return True
+        for location in self.env.agent_dict[agent_name].path_list:
+            if(location == state.location):
+                return True
+#         if (not self.not_allow_return):
+#             for location in self.env.agent_dict[agent_name].path_list:
+#                 if(location == state.location):
+#                     return True
+#         else:
+#             if(not self.env.agent_dict[agent_name].path_list):
+#                 if(state.location == self.env.agent_dict[agent_name].location):
+#                     return True
+#             elif(state.location == self.env.agent_dict[agent_name].path_list[-1]):
+#                 return True
             
         return state.location.x >= 0 and state.location.x < self.env.dimension[0] \
             and state.location.y >= 0 and state.location.y < self.env.dimension[1] \
@@ -286,6 +274,18 @@ class PBS:
         #deal with waiting out of the target
         while(path_list and fabs(path_list[-1].x - self.env.agent_dict[agent].target.x) + fabs(path_list[-1].y - self.env.agent_dict[agent].target.y) == 1):
             path_list.pop(-1)
+            
+        if self.not_allow_return:
+            check = False
+            for index in range(len(path_list)):
+                for location in self.env.agent_dict[agent].path_list:
+                    if(path_list[index] == location):
+                        path_list = path_list[:index]
+                        check = True
+                        break
+                if(check):
+                    break
+                
             
         
         append_num = self.env.buffer_size - len(self.env.agent_dict[agent].path_list)

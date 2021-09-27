@@ -9,15 +9,12 @@ author: Justin Li (@justin871030)
 import sys
 import time
 sys.path.insert(0, './')
-from cbs import PBS
-from generator import get_default_test_data
+from pbs import PBS
 from copy import deepcopy
 import matplotlib
 from matplotlib.patches import Circle, Rectangle
 import matplotlib.pyplot as plt
 from matplotlib import animation
-
-import argparse
 
 from random import randint
 
@@ -64,7 +61,7 @@ def save_map_information_at_the_time(env, shelfs, stations, parkings, constraint
             agent_shelf_locations, agent_station_locations, agent_target_locations, constraints_locations, agent_batterys]
     
 
-def run(env, map_obstacle_list, station_dict, shelf_list, parking_list, agent_list, order_list, shelf_rate = 0.66, priority_by_order_time = True, check_troubles = True, trouble_may_happen = False):
+def run(env, map_obstacle_list, station_dict, shelf_list, parking_list, agent_list, order_list, shelf_rate = 0.66, priority_by_order_time = True, not_allow_return = False, check_troubles = True, trouble_may_happen = False):
     
     map_time_location_data = []
     map_time_count_data = []
@@ -83,7 +80,7 @@ def run(env, map_obstacle_list, station_dict, shelf_list, parking_list, agent_li
     
     controller.add_orders(order_list)
     
-    pbs = PBS(env, priority_by_order_time) 
+    pbs = PBS(env, priority_by_order_time, not_allow_return) 
 
     time_count = 0
     
@@ -258,32 +255,3 @@ def visualize(env, location_data, interval = 200):
 
     return animation.FuncAnimation(fig=fig, func=animate, frames=len(location_data), init_func=init,
                                   interval=interval, blit=False)
-
-if __name__ == "__main__":
-  parser = argparse.ArgumentParser()
-  parser.add_argument("--window_size", type=int, default=15, help="window_size-factor")
-  parser.add_argument("--time_step_per_planning", type=int, default=10, help="time_step_per_planning-factor")
-  parser.add_argument("--total_run_time", type=int, default=50, help="total_run_time-factor")
-  parser.add_argument("--order_num", type=int, default=20, help="order_num-factor")
-  parser.add_argument('--video', dest='video', default=None, help="output video file (or leave empty to show on screen)")
-  parser.add_argument("--speed", type=int, default=1, help="speedup-factor")
-  args = parser.parse_args()
-
-
-
-  map_obstacle_list, station_list, shelf_list, parking_list, agent_list, order_list = get_default_test_data(order_num = args.order_num)
-
-  # see follow 20 steps without collisions and re-plan each 10 sec, search for following 100 sec from start
-  env = Environment(window_size= args.window_size, time_step_per_planning= args.time_step_per_planning, total_run_time= args.total_run_time)
-
-  map_time_location_data, map_time_count_data = run(env, map_obstacle_list, station_list, shelf_list, parking_list, agent_list, order_list)
-
-  animation = visualize(env, map_time_location_data, 1000/args.speed)
-
-  time_use(map_time_count_data)
-
-
-  if args.video:
-    animation.save(args.video)
-  else:
-    plt.show()
